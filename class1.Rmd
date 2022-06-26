@@ -1,0 +1,45 @@
+---
+title: "Class Exercise 1"
+author: Jeff Rouder
+date: June, 2020
+output: html_document
+---
+
+
+Do you know the Stroop effect?  People name the color words are displayed in.  Sometimes the word is congruent (say the word "RED" dispayed in red); sometimes the word is incongruent (say the word "GREEN" displayed in red).  Adult readers on average name congruent items faster than incongruent ones.  We would like to know if kids just learning to read, and more importantly, can we use the Stroop effect as a measure of reading automaticity.
+
+Each child the age of 7 runs a number of congruent and incongruent trials.  Each child's Stroop score is the average color naming speed in the incongruent condition minus that in the congruent condition.  So, there is a single score per person, denoted $Y_i$, with $Y_i=0$ indicating no effect.  
+
+Most reading times take around 1 second.  Stroop effects in adults tend to be about 10\% of the reading times.
+
+Let's make a few models that capture some theoretical positions
+
+Null: $\quad Y_i\sim \mbox{N}(0,.08^2)$
+
+Equivalence-Region Null: $\quad Y_i|\mu \sim \mbox{N}(\mu,.08^2), \quad \mu \sim U(-.020,.020)$
+
+Stroop Effect: $\quad Y_i|\mu \sim \mbox{N}(\mu,.08^2),\quad \mu \sim \mbox{Gamma}(2,.05)$
+
+Any Reasonble Effect: $Y_i|\mu\sim \mbox{N}(\mu,.08^2),\quad \mu \sim \mbox{N}(0,.1^2)$
+
+Any Unreasonable Effect: $Y_i|\mu\sim \mbox{N}(\mu,.08^2),\quad \mu \sim \mbox{N}(0,1^2)$
+
+
+Before we get data:
+
+- Draw predictions of your null model on sample mean $\bar{Y}$
+- Draw predictions of your effects model on sample mean $\bar{Y}$
+- Compute Bayes factor as a function of sample mean $\bar{Y}$ for a few values of $N$
+
+
+Then, run expt:
+```{r}
+set.seed(1234565)
+y=rnorm(12,.05,.08)
+```
+
+Let's work as a class to report all the BFs. 
+
+
+
+
