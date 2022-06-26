@@ -1,0 +1,195 @@
+---
+title: "Clas Assignment #2"
+author: Jeff Rouder
+date: June, 2020
+output: pdf_document
+
+header-includes   :
+   - \usepackage{bm}
+   - \usepackage{pcl}
+   - \usepackage{amsmath} 
+---
+
+```{r,echo=F,eval=T,warning=F,message=F}
+knitr::opts_chunk$set(echo = T,message=FALSE, warning=FALSE)
+set.seed(5429785)
+library(MCMCpack)
+library(rstan)
+rstan_options(auto_write = TRUE)
+```
+
+```{r processData,cache=T,echo=F}
+source('https://raw.githubusercontent.com/PerceptionAndCognitionLab/ctx-inhibition/public/shared/libRM.R')
+
+letFlanker=read.table("https://raw.githubusercontent.com/PerceptionCognitionLab/data0/master/inhibitionTasks/ReyMermetJEPLMC2018/merged/letFlanker.dat",head=T)
+a3=cleanData(letFlanker)
+letFlanker=a3[a3$acc==1,]
+letFlanker$cond=as.integer(as.factor(letFlanker$cond))
+letFlanker=letFlanker[letFlanker$cond %in% 1:2,]
+
+sub=as.integer(as.factor(letFlanker$sub))
+cond=letFlanker$cond
+rt=letFlanker$rt
+
+write.table(file='class2.dat',data.frame(sub,cond,rt),quote=FALSE,row.names=FALSE)
+```
+
+
+My colleagues at Zurich, led by then post-doctoral researcher Alodie Rey-Mermet, are very much concerned with the mental processes underlying attention and inhibition.  They collect a lot of data from a lot of people on a lot of tasks.  Here, I have provided one of their sets, a flanker tasks.  Participants must decide if a center letter is an S or C.  Sometimes the surrounding letters are S, sometimes they are C.  Half the time, the surround and center match (congruent trials);  half the time, they mismatch (incongruent trials).  Attention is needed more on incongruent than congruent trials.  The difference in RT between incongruent and congruent trials forms the *flanker effect.*
+
+The main questions are whether there is a flanker effect, and if so, how is it distributed among people?  Does everyone show the same sized flanker effect?  Is there a lot of variability?  Do some people have no flanker effects?  Do some people have opposite flanker effects?  What is going on.
+
+1. Load up the data.
+```{r}
+indat=read.table('class2.dat',head=T)
+rt=indat$rt
+sub=indat$sub
+cond=indat$cond
+I=max(sub)
+```
+
+
+2. Most psychologists would study the *observed individual flanker effect*.  Let $\bar{y}_{ij}$ be the sample mean for the $i$th person in the $j$th condition.  The observed flanker effect, $d_i$ is 
+$d_i= \bar{y}_{i2}- \bar{y}_{i1}$.  
+
+  + Tabulate these observed flanker effects and plot them.  
+  
+  + How big is the average effect?  How variable is it across people? 
+  
+  + Interpret the effects in light of the main questions above.
+
+```{r}
+m=tapply(rt,list(sub,cond),mean)
+d=m[,2]-m[,1]
+```
+
+```{r}
+plot(1:I,sort(d),ylab="Effect",xlab="Participant")
+abline(h=0)
+mean(d)
+sd(d)
+mean(d<0)
+```
+
+2. Let's fit the following model
+\[
+Y_{ijk} \sim \mbox{N}(\mu_{ij},\sigma^2)\\
+\]
+We can call this the *cell-means* model.  We have a seperate, independent parameter for each cell.  Priors: We can assume that any $\mu$ parameter is on the subsecond scale ($\mu_{ij}\sim\mbox{N}(.5,.5^2)$).  Also, standard deviations of replicate RTs are on subsecond scale too, say between 2s and .3s.  This means that variances are about hundreths to tenths of squared seconds.  A broad prior is $\sigma^2\sim\mbox{IG}(1,.05)$.  
+
+Here is some freebee code:
+
+```{r mod1,cache=T}
+model1Code <- "
+
+data {		
+		int<lower=1> n;
+		int<lower=1> I;
+    int<lower=0,upper=I> sub[n];
+    int<lower=0,upper=2> cond[n];
+    vector[n] y;
+	}
+	
+parameters {
+		matrix[I,2] mu;
+    real<lower=0> sigma2;
+	}
+	
+transformed parameters {
+    real<lower=0> sigma;
+    vector[I] theta;
+    vector[n] center;
+    sigma=sqrt(sigma2);
+    for (i in 1:I){
+    theta[i]=mu[i,2]-mu[i,1];}
+    for (k in 1:n){
+    center[k]=mu[sub[k],cond[k]];}
+	}
+	
+model {
+    to_vector(mu) ~ normal(.5,.5);
+		sigma2 ~ inv_gamma(1,.05);
+		y ~ normal(center,sigma);
+	}"
+
+model1 <- stan_model(model_code = model1Code)
+dat <- list(
+  n=length(rt),
+  I=max(sub),
+  sub=sub,
+  cond=cond,
+  y=rt)
+samples <- sampling(model1,
+                    data=dat,
+                    iter=600,
+                    chains=1,
+                    warmup=200)
+```
+
+```{r,echo=T}
+I=max(sub)
+theta=extract(samples)$theta
+thetaMean=apply(theta,2,mean)
+thetaLo=apply(theta,2,quantile,p=.05)
+thetaHi=apply(theta,2,quantile,p=.95)
+o=order(thetaMean)
+range=c(min(thetaLo),max(thetaHi))
+plot(1:I,thetaMean[o],typ='l',ylim=range,
+     ylab="Flanker Effect (sec)",
+     xlab="Participants")
+lines(1:I,thetaHi[o],lty=2)
+lines(1:I,thetaLo[o],lty=2)
+```
+
+```{r}
+plot(d,thetaMean,ylab="Posterior Mean of Theta (Model 2)",xlab="Observed Effects")
+abline(0,1)
+```
+
+
+3. The above model is equivalent to inspecting the observed flanker effects.  Let's go hierarchical.  Here is the first hierarchical model:
+
+\[
+\begin{aligned}
+Y_{ijk} &\sim \mbox{N}(\mu_{ij},\sigma^2)\\
+\mu_{ij} & \sim \mbox{N}(\eta,\delta^2)
+\end{aligned}
+\]
+
+The priors on $\eta$ and $\delta^2$ may be the aforementioned N(.5,.$5^2$) and IG(1,.05).
+
++ We may expect some regularization of the $\mu$ parameters.  Was there any?  Plot the posterior means of $\mu$ as a function of sample means to find out.  Perhaps surprisingly, there is very little regularization, why not?
+
+
+4. Maybe we need a model where we can measure individual flanker effects.  Let's do it non-hierarchical first.
+
+\[
+\begin{aligned}
+Y_{ijk} &\sim \mbox{N}(\alpha_{i}+x_j\theta_i,\sigma^2)\\
+\alpha_{i} & \sim \mbox{N}(.5,.5^2)\\
+\theta_i & \sim \mbox{N}(0,.05^2)
+\end{aligned}
+\]
+
+
+
+
+5. Let's go hierarchical on each individual's flanker effect:
+
+\[
+\begin{aligned}
+Y_{ijk} &\sim \mbox{N}(\alpha_{i}+x_j\theta_i,\sigma^2)\\
+\alpha_{i} & \sim \mbox{N}(.5,.5^2)\\
+\theta_i & \sim \mbox{N}(\eta,\delta^2)
+\end{aligned}
+\]
+with priors $\eta \sim \mbox{N}(0,.05^2)$ and $\delta \sim \mbox{IG}(1,.002)$.  These priors place mass at the 10 ms scale, which is appropriate. You can plot them if you wish to see.
+
+  - Do the analysis.  Now, plot the posterior mean of $\theta$, perhaps with credible intervals.
+    
+  - Be sure to plot the posterior mean of $\theta$ vs. the sample flanker effect.  
+  
+  - You should see a lot of regularization.  
+  
+  - What is your interpretation of these data?
+
