@@ -1,16 +1,15 @@
 ---
 title: "Class Exercise 1"
 author: Jeff Rouder
-date: June, 2020
+date: June, 2022
 output: html_document
 ---
 
+Do you know the Stroop effect? People name the color words are displayed in. Sometimes the word is congruent (say the word "RED" displayed in red); sometimes the word is incongruent (say the word "GREEN" displayed in red). Adult readers on average name congruent items faster than incongruent ones. We would like to know if kids just learning to read, and more importantly, can we use the Stroop effect as a measure of reading automaticity.
 
-Do you know the Stroop effect?  People name the color words are displayed in.  Sometimes the word is congruent (say the word "RED" dispayed in red); sometimes the word is incongruent (say the word "GREEN" displayed in red).  Adult readers on average name congruent items faster than incongruent ones.  We would like to know if kids just learning to read, and more importantly, can we use the Stroop effect as a measure of reading automaticity.
+Each child the age of 7 runs a number of congruent and incongruent trials. Each child's Stroop score is the average color naming speed in the incongruent condition minus that in the congruent condition. So, there is a single score per person, denoted $Y_i$, with $Y_i=0$ indicating no effect.
 
-Each child the age of 7 runs a number of congruent and incongruent trials.  Each child's Stroop score is the average color naming speed in the incongruent condition minus that in the congruent condition.  So, there is a single score per person, denoted $Y_i$, with $Y_i=0$ indicating no effect.  
-
-Most reading times take around 1 second.  Stroop effects in adults tend to be about 10\% of the reading times.
+Most reading times take around 1 second. Stroop effects in adults tend to be about 10% of the reading times.
 
 Let's make a few models that capture some theoretical positions
 
@@ -24,22 +23,96 @@ Any Reasonble Effect: $Y_i|\mu\sim \mbox{N}(\mu,.08^2),\quad \mu \sim \mbox{N}(0
 
 Any Unreasonable Effect: $Y_i|\mu\sim \mbox{N}(\mu,.08^2),\quad \mu \sim \mbox{N}(0,1^2)$
 
-
 Before we get data:
 
-- Draw predictions of your null model on sample mean $\bar{Y}$
-- Draw predictions of your effects model on sample mean $\bar{Y}$
-- Compute Bayes factor as a function of sample mean $\bar{Y}$ for a few values of $N$
-
+-   Draw predictions of your null model on sample mean $\bar{Y}$
+-   Draw predictions of your effects model on sample mean $\bar{Y}$
+-   Compute Bayes factor as a function of sample mean $\bar{Y}$ for a few values of $N$
 
 Then, run expt:
+
 ```{r}
 set.seed(1234565)
 y=rnorm(12,.05,.08)
 ```
 
-Let's work as a class to report all the BFs. 
+Let's work as a class to report all the BFs.
 
 
+```{r}
+N=length(y)
+```
 
 
+All the models compared
+
+```{r}
+mu=seq(-.3,.3,.001)
+plot(mu,dunif(mu,-.02,.02),typ='l',col='darkblue',ylim=c(0,30),lwd=2,xlab=expression(mu),ylab="Prior Density")
+lines(mu,dgamma(mu,shape=2,rate=20),col='darkred',lwd=2)
+lines(mu,dnorm(mu,0,.1),col='darkgreen',lwd=2)
+lines(mu,dnorm(mu,0,1),col='purple',lwd=2)
+shape::Arrows(0,0,0,30)
+legend(.1,30,c("Null","Equiv","Gamma","ReasNorm","UnReasNorm"),fill=c('black','darkblue','darkred','darkgreen','purple'))
+```
+
+
+Null Model
+
+```{r}
+normPred=function(ybar,N,b) dnorm(ybar,0,.08/sqrt(N)+b)
+
+
+ybar=seq(-.2,.6,.005)
+fnull=normPred(ybar,N,b=0)
+fReas=normPred(ybar,N,b=.1)
+fUnReas=normPred(ybar,N,b=1)
+```
+
+Equivalence Region
+
+```{r}
+integrand=function(mu,ybar,N){
+  dnorm(ybar,mu,.08/sqrt(N))*dunif(mu,-.02,.02)}
+
+predEquiv=function(ybar,N){
+  integrate(integrand,lower=-.02,upper=.02,
+            ybar=ybar,N=N)$value
+}
+
+fEquiv=1:length(ybar)
+for (i in 1:length(ybar)){
+  fEquiv[i]=predEquiv(ybar[i],N)
+}
+```
+
+Gamma Stroop Model
+
+```{r}
+integrand=function(mu,ybar,N){
+  dnorm(ybar,mu,.08/sqrt(N))*dgamma(mu,shape=2,rate=20)}
+
+predGamma=function(ybar,N){
+  integrate(integrand,lower=0,upper=1,
+            ybar=ybar,N=N)$value
+}
+
+fGamma=1:length(ybar)
+for (i in 1:length(ybar)){
+  fGamma[i]=predGamma(ybar[i],N)
+}
+```
+
+
+```{r}
+plot(typ='l',ybar,fnull,lwd=2)
+lines(ybar,fEquiv,col='darkblue',lwd=2)
+lines(ybar,fGamma,col='darkred',lwd=2)
+lines(ybar,fReas,col='darkgreen',lwd=2)
+lines(ybar,fUnReas,col='purple',lwd=2)
+abline(v=mean(y))
+
+bf=c(predEq(mean(y),N),predGamma(mean(y),N),normPred(mean(y),N,b=.1),normPred(mean(y),N,b=1))/normPred(mean(y),N,0)
+names(bf)=c("Equiv","Gamma","Reas","Unreas")
+print(round(bf,1))
+```
