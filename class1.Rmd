@@ -112,7 +112,7 @@ lines(ybar,fReas,col='darkgreen',lwd=2)
 lines(ybar,fUnReas,col='purple',lwd=2)
 abline(v=mean(y))
 
-bf=c(predEq(mean(y),N),predGamma(mean(y),N),normPred(mean(y),N,b=.1),normPred(mean(y),N,b=1))/normPred(mean(y),N,0)
+bf=c(predEquiv(mean(y),N),predGamma(mean(y),N),normPred(mean(y),N,b=.1),normPred(mean(y),N,b=1))/normPred(mean(y),N,0)
 names(bf)=c("Equiv","Gamma","Reas","Unreas")
 print(round(bf,1))
 ```
