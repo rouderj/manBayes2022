@@ -1,0 +1,89 @@
+---
+title: "stan for normal model"
+author: Jeff Rouder
+date: Winter 2020
+output: pdf_document
+
+header-includes   :
+   - \usepackage{bm}
+   - \usepackage{pcl}
+   - \usepackage{amsmath} 
+---
+
+```{r}
+library(knitr)
+library(rstan)
+knitr::opts_chunk$set(echo = TRUE,message=FALSE, warning=FALSE)
+rstan_options(auto_write = TRUE)
+set.seed(5429785)
+```
+
+
+
+# Model 1
+
+Analyze data from a single condition, say IQ, with a normal:
+
+\[
+\begin{aligned}
+Y_i &\sim \mbox{N}(\mu,\sigma^2)\\
+\mu &\sim \mbox{N}(a,b)\\
+\sigma^2 &\sim \mbox{IG}(q,s)
+\end{aligned}
+\]
+
+
+```{r makeData1}
+y=rnorm(100,105,15)
+```
+
+```{r specifyModel1,cache=TRUE}
+model1Code <- "
+
+data {		
+		int<lower=1> n;
+		vector[n] y;
+	}
+	
+parameters {
+		real mu;
+    real<lower=0> sigma2;
+	}
+	
+transformed parameters {
+    real<lower=0> sigma;
+    sigma=sqrt(sigma2);
+	}
+	
+model {
+    mu ~ normal(100,10);
+		sigma2 ~ inv_gamma(.1,.1);
+		y ~ normal(mu,sigma);
+	}"
+
+model1 <- stan_model(model_code = model1Code)
+```
+
+```{r analysisModel1}
+dat <- list(y=y,n=length(y))
+samples <- sampling(model1,
+                    data=dat,
+                    iter=600,
+                    chains=4,
+                    warmup=200)
+mu <- extract(samples)$mu
+sigma2 <- extract(samples)$sigma2
+```
+
+```{r}
+hist(mu)
+mean(mu)
+sd(mu)
+quantile(mu,c(.025,.975))
+```
+
+```{r}
+hist(sqrt(sigma2))
+mean(sqrt(sigma2))
+quantile(sqrt(sigma2),c(.025,.975))
+```
